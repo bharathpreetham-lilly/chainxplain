@@ -1,20 +1,39 @@
 [tool.poetry]
 name = "chainxplain"
 version = "0.1.0"
-description = "AI-powered blockchain contract and wallet analyzer with MCP server support"
-authors = ["Your Name <your.email@example.com>"]
+description = "Production-grade AI-powered blockchain analysis toolkit with security scanning, REST API, and multi-chain support"
+authors = ["Bharath Preetham <bharathpreetham.lilly@example.com>"]
 readme = "README.md"
 license = "MIT"
 homepage = "https://github.com/bharathpreetham-lilly/chainxplain"
 repository = "https://github.com/bharathpreetham-lilly/chainxplain"
-keywords = ["blockchain", "ethereum", "smart-contracts", "ai", "mcp", "claude"]
+documentation = "https://github.com/bharathpreetham-lilly/chainxplain#readme"
+keywords = [
+    "blockchain", 
+    "ethereum", 
+    "smart-contracts", 
+    "ai", 
+    "mcp", 
+    "claude",
+    "security-analysis",
+    "defi",
+    "web3",
+    "cryptocurrency",
+    "fastapi",
+    "vulnerability-scanner"
+]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Office/Business :: Financial",
+    "Framework :: FastAPI",
 ]
 packages = [{include = "chainxplain", from = "src"}]
 
