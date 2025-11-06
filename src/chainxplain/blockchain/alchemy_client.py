@@ -11,13 +11,13 @@ Provides access to Alchemy's enhanced APIs including:
 
 from typing import Any, Dict, List, Optional
 import httpx
-from ..config import Config
+from ..config import Settings
 
 
 class AlchemyClient:
     """Client for Alchemy API interactions."""
     
-    def __init__(self, config: Config, chain: str = "ethereum"):
+    def __init__(self, config: Settings, chain: str = "ethereum"):
         """
         Initialize Alchemy client.
         
@@ -275,7 +275,7 @@ class AlchemyClient:
             return data.get("result", {})
 
 
-def is_alchemy_available(config: Config, chain: str = "ethereum") -> bool:
+def is_alchemy_available(config: Settings, chain: str = "ethereum") -> bool:
     """
     Check if Alchemy API is configured for a chain.
     

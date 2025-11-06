@@ -121,24 +121,25 @@ class ChainConfig:
             )
         return cls.CHAINS[chain]
 
-    def get_rpc_url(self, chain: str) -> str:
+    @classmethod
+    def get_rpc_url(cls, chain: str, settings: Settings) -> str:
         """Get RPC URL for a specific chain, using Alchemy if available."""
         chain = chain.lower()
         
         # Check for chain-specific Alchemy key first
         alchemy_key = None
-        if chain == "ethereum" and self.alchemy_ethereum_api_key:
-            alchemy_key = self.alchemy_ethereum_api_key
-        elif chain == "polygon" and self.alchemy_polygon_api_key:
-            alchemy_key = self.alchemy_polygon_api_key
-        elif chain == "arbitrum" and self.alchemy_arbitrum_api_key:
-            alchemy_key = self.alchemy_arbitrum_api_key
-        elif chain == "base" and self.alchemy_base_api_key:
-            alchemy_key = self.alchemy_base_api_key
-        elif chain == "optimism" and self.alchemy_optimism_api_key:
-            alchemy_key = self.alchemy_optimism_api_key
-        elif self.alchemy_api_key:
-            alchemy_key = self.alchemy_api_key
+        if chain == "ethereum" and settings.alchemy_ethereum_api_key:
+            alchemy_key = settings.alchemy_ethereum_api_key
+        elif chain == "polygon" and settings.alchemy_polygon_api_key:
+            alchemy_key = settings.alchemy_polygon_api_key
+        elif chain == "arbitrum" and settings.alchemy_arbitrum_api_key:
+            alchemy_key = settings.alchemy_arbitrum_api_key
+        elif chain == "base" and settings.alchemy_base_api_key:
+            alchemy_key = settings.alchemy_base_api_key
+        elif chain == "optimism" and settings.alchemy_optimism_api_key:
+            alchemy_key = settings.alchemy_optimism_api_key
+        elif settings.alchemy_api_key:
+            alchemy_key = settings.alchemy_api_key
         
         # If Alchemy key is available, use Alchemy RPC
         if alchemy_key:
@@ -152,12 +153,16 @@ class ChainConfig:
             if chain in alchemy_networks:
                 return alchemy_networks[chain]
         
-        # Fallback to custom RPC or public RPCs
-        custom_rpc = self.rpc_urls.get(chain)
-        if custom_rpc:
-            return custom_rpc
+        # Fallback to configured RPC URLs
+        rpc_urls = {
+            "ethereum": settings.ethereum_rpc_url,
+            "polygon": settings.polygon_rpc_url,
+            "arbitrum": settings.arbitrum_rpc_url,
+            "optimism": settings.optimism_rpc_url,
+            "bsc": settings.bsc_rpc_url,
+        }
         
-        return self._default_rpc_urls.get(chain, "https://eth.llamarpc.com")
+        return rpc_urls.get(chain, settings.ethereum_rpc_url)
 
     @classmethod
     def get_explorer_api_key(cls, chain: str, settings: Settings) -> Optional[str]:

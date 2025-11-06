@@ -1,10 +1,8 @@
-"""AI-powered analysis using Claude."""
+"""AI-powered analysis using Claude or OpenAI."""
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from datetime import datetime
-
-from anthropic import Anthropic
 
 from chainxplain.config import Settings
 from chainxplain.models import (
@@ -17,14 +15,29 @@ from chainxplain.models import (
 
 
 class AIAnalyzer:
-    """AI analyzer using Claude for smart contract and wallet analysis."""
+    """AI analyzer using Claude or OpenAI for smart contract and wallet analysis."""
 
     def __init__(self, settings: Settings):
         """Initialize AI analyzer."""
         self.settings = settings
-        self.client = Anthropic(api_key=settings.anthropic_api_key)
-        self.model = settings.claude_model
         self.max_tokens = settings.max_tokens
+        
+        # Determine which AI provider to use
+        if settings.openai_api_key:
+            from openai import OpenAI
+            self.provider = "openai"
+            self.client = OpenAI(api_key=settings.openai_api_key)
+            self.model = "gpt-4o"  # Latest GPT-4 model
+        elif settings.anthropic_api_key:
+            from anthropic import Anthropic
+            self.provider = "anthropic"
+            self.client = Anthropic(api_key=settings.anthropic_api_key)
+            self.model = settings.claude_model
+        else:
+            raise ValueError(
+                "Either OPENAI_API_KEY or ANTHROPIC_API_KEY must be set. "
+                "Set one in your .env file."
+            )
 
     def analyze_contract(
         self,
@@ -32,7 +45,7 @@ class AIAnalyzer:
         chain: str,
     ) -> ContractAnalysis:
         """
-        Analyze a smart contract using Claude.
+        Analyze a smart contract using AI (Claude or OpenAI).
 
         Args:
             contract_info: Contract information from explorer
@@ -44,15 +57,8 @@ class AIAnalyzer:
         # Build analysis prompt
         prompt = self._build_contract_prompt(contract_info, chain)
 
-        # Call Claude
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
-        # Parse response
-        analysis_text = response.content[0].text
+        # Call AI provider
+        analysis_text = self._call_ai(prompt)
 
         # Extract structured data from response
         analysis_data = self._parse_contract_analysis(analysis_text)
@@ -80,7 +86,7 @@ class AIAnalyzer:
         chain: str,
     ) -> WalletAnalysis:
         """
-        Analyze a wallet using Claude.
+        Analyze a wallet using AI (Claude or OpenAI).
 
         Args:
             wallet_data: Wallet data (balance, transactions, tokens)
@@ -92,15 +98,8 @@ class AIAnalyzer:
         # Build analysis prompt
         prompt = self._build_wallet_prompt(wallet_data, chain)
 
-        # Call Claude
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
-        # Parse response
-        analysis_text = response.content[0].text
+        # Call AI provider
+        analysis_text = self._call_ai(prompt)
         analysis_data = self._parse_wallet_analysis(analysis_text)
 
         # Convert transactions to TransactionSummary
@@ -137,7 +136,7 @@ class AIAnalyzer:
         chain: str,
     ) -> TransactionAnalysis:
         """
-        Analyze a transaction using Claude.
+        Analyze a transaction using AI (Claude or OpenAI).
 
         Args:
             tx_data: Transaction data
@@ -148,13 +147,8 @@ class AIAnalyzer:
         """
         prompt = self._build_transaction_prompt(tx_data, chain)
 
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
-        analysis_text = response.content[0].text
+        # Call AI provider
+        analysis_text = self._call_ai(prompt)
         analysis_data = self._parse_transaction_analysis(analysis_text)
 
         return TransactionAnalysis(
@@ -347,3 +341,30 @@ Respond ONLY with valid JSON."""
             "parameters": {},
             "risks": [],
         }
+
+    def _call_ai(self, prompt: str) -> str:
+        """
+        Call AI provider (OpenAI or Anthropic) and return response text.
+        
+        Args:
+            prompt: The prompt to send to the AI
+            
+        Returns:
+            The AI's response as text
+        """
+        if self.provider == "openai":
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=self.max_tokens,
+                temperature=0.7,
+            )
+            return response.choices[0].message.content
+        
+        else:  # anthropic
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return response.content[0].text

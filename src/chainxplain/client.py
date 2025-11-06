@@ -16,6 +16,7 @@ class ChainExplainClient:
     def __init__(
         self,
         anthropic_api_key: Optional[str] = None,
+        openai_api_key: Optional[str] = None,
         etherscan_api_key: Optional[str] = None,
         alchemy_api_key: Optional[str] = None,
         ethereum_rpc: Optional[str] = None,
@@ -26,6 +27,7 @@ class ChainExplainClient:
 
         Args:
             anthropic_api_key: Anthropic API key (overrides env)
+            openai_api_key: OpenAI API key (overrides env)
             etherscan_api_key: Etherscan API key (overrides env)
             alchemy_api_key: Alchemy API key (overrides env) - recommended for better reliability
             ethereum_rpc: Ethereum RPC URL (overrides env)
@@ -37,6 +39,8 @@ class ChainExplainClient:
         # Override with provided values
         if anthropic_api_key:
             self.settings.anthropic_api_key = anthropic_api_key
+        if openai_api_key:
+            self.settings.openai_api_key = openai_api_key
         if etherscan_api_key:
             self.settings.etherscan_api_key = etherscan_api_key
         if alchemy_api_key:
@@ -44,11 +48,11 @@ class ChainExplainClient:
         if ethereum_rpc:
             self.settings.ethereum_rpc_url = ethereum_rpc
 
-        # Validate required keys
-        if not self.settings.anthropic_api_key:
+        # Validate that at least one AI API key is provided
+        if not self.settings.anthropic_api_key and not self.settings.openai_api_key:
             raise ValueError(
-                "Anthropic API key is required. "
-                "Set ANTHROPIC_API_KEY environment variable or pass anthropic_api_key parameter."
+                "Either ANTHROPIC_API_KEY or OPENAI_API_KEY is required. "
+                "Set one in your .env file or pass as parameter."
             )
 
         # Initialize components
