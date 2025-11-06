@@ -9,6 +9,13 @@ from chainxplain.blockchain.alchemy_client import AlchemyClient, is_alchemy_avai
 from chainxplain.ai.analyzer import AIAnalyzer, AIAnalysisError
 from chainxplain.config import Settings, ChainConfig, load_settings
 from chainxplain.models import ContractAnalysis, WalletAnalysis, TransactionAnalysis
+from chainxplain.validation import (
+    validate_ethereum_address,
+    validate_transaction_hash,
+    validate_chain_name,
+    validate_positive_integer,
+    ValidationError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +94,18 @@ class ChainExplainClient:
 
         Returns:
             ContractAnalysis with AI-generated insights
+            
+        Raises:
+            ValidationError: If inputs are invalid
+            BlockchainError: If blockchain interaction fails
+            AIAnalysisError: If AI analysis fails
         """
+        # Validate inputs
+        address = validate_ethereum_address(address)
+        chain = validate_chain_name(chain, list(ChainConfig.CHAINS.keys()))
+        
+        logger.info(f"Analyzing contract {address} on {chain}")
+
         # Validate chain
         ChainConfig.get_chain_config(chain)
 
@@ -123,7 +141,19 @@ class ChainExplainClient:
 
         Returns:
             WalletAnalysis with insights
+            
+        Raises:
+            ValidationError: If inputs are invalid
+            BlockchainError: If blockchain interaction fails
+            AIAnalysisError: If AI analysis fails
         """
+        # Validate inputs
+        address = validate_ethereum_address(address)
+        chain = validate_chain_name(chain, list(ChainConfig.CHAINS.keys()))
+        limit = validate_positive_integer(limit, max_value=1000, field_name="limit")
+        
+        logger.info(f"Analyzing wallet {address} on {chain} (limit: {limit})")
+        
         # Validate chain
         ChainConfig.get_chain_config(chain)
 
@@ -161,7 +191,18 @@ class ChainExplainClient:
 
         Returns:
             TransactionAnalysis with explanation
+            
+        Raises:
+            ValidationError: If inputs are invalid
+            BlockchainError: If blockchain interaction fails
+            AIAnalysisError: If AI analysis fails
         """
+        # Validate inputs
+        tx_hash = validate_transaction_hash(tx_hash)
+        chain = validate_chain_name(chain, list(ChainConfig.CHAINS.keys()))
+        
+        logger.info(f"Analyzing transaction {tx_hash} on {chain}")
+        
         # Get transaction details
         tx_data = self.web3_client.get_transaction(tx_hash, chain)
 

@@ -25,7 +25,7 @@ def sample_contract_address():
 @pytest.fixture
 def sample_wallet_address():
     """Sample wallet address for testing."""
-    return "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+    return "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0"  # Fixed to 42 chars
 
 
 @pytest.fixture

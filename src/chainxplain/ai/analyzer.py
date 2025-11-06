@@ -4,8 +4,10 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
+from ratelimit import limits, sleep_and_retry
 
 from chainxplain.config import Settings
+from chainxplain.ai.security import SecurityAnalyzer
 from chainxplain.models import (
     ContractAnalysis,
     WalletAnalysis,
@@ -29,6 +31,9 @@ class AIAnalyzer:
         """Initialize AI analyzer."""
         self.settings = settings
         self.max_tokens = settings.max_tokens
+        
+        # Initialize security analyzer for advanced features
+        self.security_analyzer = SecurityAnalyzer()
         
         # Determine which AI provider to use
         try:
@@ -374,9 +379,12 @@ Respond ONLY with valid JSON."""
             "risks": [],
         }
 
+    @sleep_and_retry
+    @limits(calls=5, period=60)  # 5 calls per minute
     def _call_ai(self, prompt: str) -> str:
         """
         Call AI provider (OpenAI or Anthropic) and return response text.
+        Rate limited to 5 calls per minute.
         
         Args:
             prompt: The prompt to send to the AI
