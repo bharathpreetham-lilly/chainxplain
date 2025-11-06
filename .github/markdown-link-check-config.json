@@ -1,0 +1,19 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^https://github\\.com/.*/blob/main/"
+    },
+    {
+      "pattern": "^https://console\\.anthropic\\.com/"
+    },
+    {
+      "pattern": "^https://dashboard\\.alchemy\\.com/"
+    }
+  ],
+  "replacementPatterns": [],
+  "httpHeaders": [],
+  "timeout": "20s",
+  "retryOn429": true,
+  "retryCount": 3,
+  "aliveStatusCodes": [200, 206]
+}

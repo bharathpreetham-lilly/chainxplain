@@ -1,0 +1,91 @@
+name: Code Quality
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.7.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run Ruff (detailed)
+        run: |
+          poetry run ruff check src/ examples/ tests/ \
+            --output-format=github \
+            --exit-zero
+
+      - name: Check code complexity
+        run: |
+          poetry run pip install radon
+          echo "### Cyclomatic Complexity" >> $GITHUB_STEP_SUMMARY
+          poetry run radon cc src/ -a -nb >> $GITHUB_STEP_SUMMARY || true
+          
+          echo "### Maintainability Index" >> $GITHUB_STEP_SUMMARY
+          poetry run radon mi src/ -nb >> $GITHUB_STEP_SUMMARY || true
+
+      - name: Check documentation coverage
+        run: |
+          poetry run pip install interrogate
+          poetry run interrogate -v src/ --fail-under 0 || true
+
+      - name: Generate complexity report
+        run: |
+          poetry run pip install radon
+          poetry run radon cc src/ -a -j > complexity.json || true
+          poetry run radon mi src/ -j > maintainability.json || true
+
+      - name: Upload complexity reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-quality-reports
+          path: |
+            complexity.json
+            maintainability.json
+
+  sonarcloud:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=bharathpreetham-lilly_chainxplain
+            -Dsonar.organization=bharathpreetham-lilly
+            -Dsonar.python.version=3.10,3.11,3.12
+            -Dsonar.sources=src/
+            -Dsonar.tests=tests/
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+        continue-on-error: true

@@ -1,0 +1,42 @@
+# Configuration for labeling PRs based on changed files
+# Syntax: label name followed by file patterns to match
+
+blockchain:
+  - changed-files:
+    - any-glob-to-any-file: 'src/chainxplain/blockchain/**'
+
+ai:
+  - changed-files:
+    - any-glob-to-any-file: 'src/chainxplain/ai/**'
+
+mcp:
+  - changed-files:
+    - any-glob-to-any-file: 'src/chainxplain/mcp/**'
+
+cli:
+  - changed-files:
+    - any-glob-to-any-file: 'src/chainxplain/cli/**'
+
+tests:
+  - changed-files:
+    - any-glob-to-any-file: 'tests/**'
+
+documentation:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/*.md'
+      - 'docs/**'
+
+ci/cd:
+  - changed-files:
+    - any-glob-to-any-file: '.github/**'
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pyproject.toml'
+      - 'poetry.lock'
+
+examples:
+  - changed-files:
+    - any-glob-to-any-file: 'examples/**'
