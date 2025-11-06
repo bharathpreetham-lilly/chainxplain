@@ -1,13 +1,16 @@
 """Main client for ChainXplain."""
 
+import logging
 from typing import Optional
 
-from chainxplain.blockchain.web3_client import Web3Client
+from chainxplain.blockchain.web3_client import Web3Client, BlockchainError
 from chainxplain.blockchain.explorer import ExplorerClient
 from chainxplain.blockchain.alchemy_client import AlchemyClient, is_alchemy_available
-from chainxplain.ai.analyzer import AIAnalyzer
+from chainxplain.ai.analyzer import AIAnalyzer, AIAnalysisError
 from chainxplain.config import Settings, ChainConfig, load_settings
 from chainxplain.models import ContractAnalysis, WalletAnalysis, TransactionAnalysis
+
+logger = logging.getLogger(__name__)
 
 
 class ChainExplainClient:
@@ -33,6 +36,8 @@ class ChainExplainClient:
             ethereum_rpc: Ethereum RPC URL (overrides env)
             settings: Pre-loaded settings (for testing)
         """
+        logger.info("Initializing ChainExplainClient")
+        
         # Load settings
         self.settings = settings or load_settings()
 
@@ -50,15 +55,21 @@ class ChainExplainClient:
 
         # Validate that at least one AI API key is provided
         if not self.settings.anthropic_api_key and not self.settings.openai_api_key:
+            logger.error("No AI API key provided")
             raise ValueError(
                 "Either ANTHROPIC_API_KEY or OPENAI_API_KEY is required. "
                 "Set one in your .env file or pass as parameter."
             )
 
         # Initialize components
-        self.web3_client = Web3Client(self.settings)
-        self.explorer_client = ExplorerClient(self.settings)
-        self.ai_analyzer = AIAnalyzer(self.settings)
+        try:
+            self.web3_client = Web3Client(self.settings)
+            self.explorer_client = ExplorerClient(self.settings)
+            self.ai_analyzer = AIAnalyzer(self.settings)
+            logger.info("ChainExplainClient initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize ChainExplainClient: {e}")
+            raise
 
     def analyze_contract(
         self,

@@ -9,9 +9,17 @@ Provides access to Alchemy's enhanced APIs including:
 - Enhanced trace APIs
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 import httpx
 from ..config import Settings
+
+logger = logging.getLogger(__name__)
+
+
+class AlchemyError(Exception):
+    """Exception raised for Alchemy API errors."""
+    pass
 
 
 class AlchemyClient:
@@ -25,10 +33,17 @@ class AlchemyClient:
             config: Application configuration
             chain: Blockchain network name
         """
+        logger.info(f"Initializing Alchemy client for chain: {chain}")
         self.config = config
         self.chain = chain.lower()
-        self.api_key = self._get_api_key()
-        self.base_url = self._get_base_url()
+        
+        try:
+            self.api_key = self._get_api_key()
+            self.base_url = self._get_base_url()
+            logger.debug(f"Alchemy client initialized: {self.base_url[:50]}...")
+        except Exception as e:
+            logger.error(f"Failed to initialize Alchemy client: {e}")
+            raise AlchemyError(f"Alchemy initialization failed: {e}") from e
         
     def _get_api_key(self) -> Optional[str]:
         """Get the appropriate Alchemy API key for the chain."""

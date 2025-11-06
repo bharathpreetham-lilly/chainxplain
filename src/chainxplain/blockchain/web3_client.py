@@ -1,5 +1,6 @@
 """Web3 client for blockchain interactions."""
 
+import logging
 from typing import Any, Dict, Optional
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
@@ -7,6 +8,13 @@ from cachetools import TTLCache
 from eth_utils import is_address, to_checksum_address
 
 from chainxplain.config import Settings, ChainConfig
+
+logger = logging.getLogger(__name__)
+
+
+class BlockchainError(Exception):
+    """Raised when blockchain interaction fails."""
+    pass
 
 
 class Web3Client:
@@ -17,29 +25,43 @@ class Web3Client:
         self.settings = settings
         self._connections: Dict[str, Web3] = {}
         self._cache = TTLCache(maxsize=1000, ttl=settings.cache_ttl)
+        logger.info("Initialized Web3 client")
 
     def _get_web3(self, chain: str) -> Web3:
         """Get or create Web3 connection for a chain."""
         if chain not in self._connections:
-            rpc_url = ChainConfig.get_rpc_url(chain, self.settings)
-            w3 = Web3(Web3.HTTPProvider(rpc_url))
+            try:
+                rpc_url = ChainConfig.get_rpc_url(chain, self.settings)
+                logger.info(f"Connecting to {chain} RPC: {rpc_url[:50]}...")
+                
+                w3 = Web3(Web3.HTTPProvider(rpc_url))
 
-            # Add PoA middleware for chains that need it (Polygon, BSC)
-            if chain in ["polygon", "bsc"]:
-                w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+                # Add PoA middleware for chains that need it (Polygon, BSC)
+                if chain in ["polygon", "bsc"]:
+                    w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+                    logger.debug(f"Added PoA middleware for {chain}")
 
-            if not w3.is_connected():
-                raise ConnectionError(f"Failed to connect to {chain} RPC: {rpc_url}")
+                if not w3.is_connected():
+                    logger.error(f"Failed to connect to {chain} RPC: {rpc_url}")
+                    raise BlockchainError(f"Failed to connect to {chain} RPC: {rpc_url}")
 
-            self._connections[chain] = w3
+                self._connections[chain] = w3
+                logger.info(f"Successfully connected to {chain} (chain ID: {w3.eth.chain_id})")
+                
+            except Exception as e:
+                logger.error(f"Error connecting to {chain}: {e}")
+                raise BlockchainError(f"Failed to connect to {chain}: {e}") from e
 
         return self._connections[chain]
 
     def _validate_address(self, address: str) -> str:
         """Validate and checksum an Ethereum address."""
         if not is_address(address):
+            logger.warning(f"Invalid address format: {address}")
             raise ValueError(f"Invalid Ethereum address: {address}")
-        return to_checksum_address(address)
+        checksummed = to_checksum_address(address)
+        logger.debug(f"Validated address: {checksummed}")
+        return checksummed
 
     def get_balance(self, address: str, chain: str) -> str:
         """
@@ -51,19 +73,30 @@ class Web3Client:
 
         Returns:
             Balance in Wei as string
+            
+        Raises:
+            BlockchainError: If balance fetch fails
         """
-        cache_key = f"balance:{chain}:{address}"
-        if cache_key in self._cache:
-            return self._cache[cache_key]
+        try:
+            cache_key = f"balance:{chain}:{address}"
+            if cache_key in self._cache:
+                logger.debug(f"Cache hit for balance: {address}")
+                return self._cache[cache_key]
 
-        w3 = self._get_web3(chain)
-        address = self._validate_address(address)
+            w3 = self._get_web3(chain)
+            address = self._validate_address(address)
 
-        balance = w3.eth.get_balance(address)
-        balance_str = str(balance)
+            logger.debug(f"Fetching balance for {address} on {chain}")
+            balance = w3.eth.get_balance(address)
+            balance_str = str(balance)
 
-        self._cache[cache_key] = balance_str
-        return balance_str
+            self._cache[cache_key] = balance_str
+            logger.info(f"Retrieved balance for {address}: {balance_str} wei")
+            return balance_str
+            
+        except Exception as e:
+            logger.error(f"Failed to get balance for {address} on {chain}: {e}")
+            raise BlockchainError(f"Failed to get balance: {e}") from e
 
     def get_contract_code(self, address: str, chain: str) -> str:
         """

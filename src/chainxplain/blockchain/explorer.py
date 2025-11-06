@@ -1,5 +1,6 @@
 """Blockchain explorer API client."""
 
+import logging
 import time
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -10,15 +11,24 @@ from cachetools import TTLCache
 
 from chainxplain.config import Settings, ChainConfig
 
+logger = logging.getLogger(__name__)
+
+
+class ExplorerError(Exception):
+    """Exception raised for Explorer API errors."""
+    pass
+
 
 class ExplorerClient:
     """Client for blockchain explorer APIs (Etherscan, etc.)."""
 
     def __init__(self, settings: Settings):
         """Initialize explorer client."""
+        logger.info("Initializing Explorer client")
         self.settings = settings
         self._cache = TTLCache(maxsize=1000, ttl=settings.cache_ttl)
         self._rate_limiter = RateLimiter(settings.rate_limit)
+        logger.debug(f"Explorer client initialized with cache TTL: {settings.cache_ttl}s")
 
     def _get_api_url(self, chain: str) -> str:
         """Get explorer API URL for a chain."""
@@ -49,29 +59,38 @@ class ExplorerClient:
         Returns:
             API response data
         """
+        logger.debug(f"Making explorer API request: chain={chain}, module={module}, action={action}")
         self._rate_limiter.wait()
 
-        api_url = self._get_api_url(chain)
-        api_key = self._get_api_key(chain)
+        try:
+            api_url = self._get_api_url(chain)
+            api_key = self._get_api_key(chain)
 
-        request_params = {
-            "module": module,
-            "action": action,
-            **params,
-        }
+            request_params = {
+                "module": module,
+                "action": action,
+                **params,
+            }
 
-        if api_key:
-            request_params["apikey"] = api_key
+            if api_key:
+                request_params["apikey"] = api_key
 
-        response = requests.get(api_url, params=request_params, timeout=30)
-        response.raise_for_status()
+            response = requests.get(api_url, params=request_params, timeout=30)
+            response.raise_for_status()
 
-        data = response.json()
+            data = response.json()
 
-        if data.get("status") == "0" and data.get("message") != "No transactions found":
-            raise Exception(f"Explorer API error: {data.get('result', 'Unknown error')}")
+            if data.get("status") == "0" and data.get("message") != "No transactions found":
+                error_msg = f"Explorer API error: {data.get('result', 'Unknown error')}"
+                logger.error(error_msg)
+                raise ExplorerError(error_msg)
 
-        return data
+            logger.debug(f"Explorer API request successful: {module}.{action}")
+            return data
+        
+        except requests.RequestException as e:
+            logger.error(f"HTTP error during explorer API request: {e}")
+            raise ExplorerError(f"Failed to connect to explorer API: {e}") from e
 
     def get_contract_info(self, address: str, chain: str) -> Dict[str, Any]:
         """

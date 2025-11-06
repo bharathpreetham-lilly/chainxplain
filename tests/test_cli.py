@@ -18,8 +18,10 @@ def mock_client_instance():
     # Mock contract analysis
     client.analyze_contract.return_value = ContractAnalysis(
         address="0xtest",
+        chain="ethereum",
         name="Test Token",
         summary="A test token contract",
+        purpose="ERC-20 token for testing",
         risk_level="low",
         key_functions=["transfer", "approve"],
         is_verified=True,
@@ -29,17 +31,23 @@ def mock_client_instance():
     # Mock wallet analysis
     client.analyze_wallet.return_value = WalletAnalysis(
         address="0xwallet",
+        chain="ethereum",
+        native_balance="10.5",
         total_transactions=100,
-        token_holdings=[{"symbol": "ETH", "balance": 10.5, "value_usd": 21000}],
-        recent_activity=[{"type": "transfer", "description": "Sent 1 ETH"}],
+        token_holdings={"ETH": {"balance": 10.5, "value_usd": 21000}},
         summary="Active wallet",
-        insights=["Frequently trades tokens"],
+        activity_pattern="Regular DeFi interactions",
+        wallet_type="DeFi user",
+        notable_interactions=["Frequently trades tokens"],
     )
     
     # Mock transaction analysis
+    from datetime import datetime
     client.analyze_transaction.return_value = TransactionAnalysis(
-        tx_hash="0xtx",
-        status="success",
+        hash="0xtx",
+        chain="ethereum",
+        status=True,
+        timestamp=datetime.utcnow(),
         from_address="0xfrom",
         to_address="0xto",
         value="1.0",
@@ -109,5 +117,9 @@ def test_cli_explain_verbose(mock_client_instance):
     """Test explain command with verbose flag."""
     with patch("chainxplain.cli.main.get_client", return_value=mock_client_instance):
         result = runner.invoke(app, ["explain", "0xtest", "--verbose"])
+        
+        if result.exit_code != 0:
+            print(f"Error output: {result.stdout}")
+            print(f"Exception: {result.exception}")
         
         assert result.exit_code == 0

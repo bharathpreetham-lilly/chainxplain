@@ -1,6 +1,7 @@
 """AI-powered analysis using Claude or OpenAI."""
 
 import json
+import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
@@ -13,6 +14,13 @@ from chainxplain.models import (
     TransactionSummary,
 )
 
+logger = logging.getLogger(__name__)
+
+
+class AIAnalysisError(Exception):
+    """Raised when AI analysis fails."""
+    pass
+
 
 class AIAnalyzer:
     """AI analyzer using Claude or OpenAI for smart contract and wallet analysis."""
@@ -23,21 +31,30 @@ class AIAnalyzer:
         self.max_tokens = settings.max_tokens
         
         # Determine which AI provider to use
-        if settings.openai_api_key:
-            from openai import OpenAI
-            self.provider = "openai"
-            self.client = OpenAI(api_key=settings.openai_api_key)
-            self.model = "gpt-4o"  # Latest GPT-4 model
-        elif settings.anthropic_api_key:
-            from anthropic import Anthropic
-            self.provider = "anthropic"
-            self.client = Anthropic(api_key=settings.anthropic_api_key)
-            self.model = settings.claude_model
-        else:
-            raise ValueError(
-                "Either OPENAI_API_KEY or ANTHROPIC_API_KEY must be set. "
-                "Set one in your .env file."
-            )
+        try:
+            if settings.openai_api_key:
+                from openai import OpenAI
+                self.provider = "openai"
+                self.client = OpenAI(api_key=settings.openai_api_key)
+                self.model = "gpt-4o"  # Latest GPT-4 model
+                logger.info(f"Initialized AI analyzer with OpenAI (model: {self.model})")
+            elif settings.anthropic_api_key:
+                from anthropic import Anthropic
+                self.provider = "anthropic"
+                self.client = Anthropic(api_key=settings.anthropic_api_key)
+                self.model = settings.claude_model
+                logger.info(f"Initialized AI analyzer with Anthropic (model: {self.model})")
+            else:
+                raise ValueError(
+                    "Either OPENAI_API_KEY or ANTHROPIC_API_KEY must be set. "
+                    "Set one in your .env file."
+                )
+        except ImportError as e:
+            logger.error(f"Failed to import AI provider library: {e}")
+            raise AIAnalysisError(f"AI provider library not installed: {e}")
+        except Exception as e:
+            logger.error(f"Failed to initialize AI analyzer: {e}")
+            raise
 
     def analyze_contract(
         self,
@@ -53,32 +70,47 @@ class AIAnalyzer:
 
         Returns:
             ContractAnalysis with AI-generated insights
+            
+        Raises:
+            AIAnalysisError: If analysis fails
         """
-        # Build analysis prompt
-        prompt = self._build_contract_prompt(contract_info, chain)
+        try:
+            logger.info(f"Analyzing contract {contract_info.get('address')} on {chain}")
+            
+            # Build analysis prompt
+            prompt = self._build_contract_prompt(contract_info, chain)
 
-        # Call AI provider
-        analysis_text = self._call_ai(prompt)
+            # Call AI provider
+            analysis_text = self._call_ai(prompt)
+            
+            logger.debug(f"Received AI response: {len(analysis_text)} characters")
 
-        # Extract structured data from response
-        analysis_data = self._parse_contract_analysis(analysis_text)
+            # Extract structured data from response
+            analysis_data = self._parse_contract_analysis(analysis_text)
 
-        # Build ContractAnalysis object
-        return ContractAnalysis(
-            address=contract_info["address"],
-            chain=chain,
-            name=contract_info.get("name", "Unknown"),
-            is_verified=contract_info.get("is_verified", False),
-            compiler_version=contract_info.get("compiler_version"),
-            summary=analysis_data.get("summary", analysis_text[:500]),
-            purpose=analysis_data.get("purpose", "Unknown"),
-            risk_level=RiskLevel(analysis_data.get("risk_level", "unknown")),
-            risk_factors=analysis_data.get("risk_factors", []),
-            key_functions=analysis_data.get("key_functions", []),
-            token_info=analysis_data.get("token_info"),
-            source_code=contract_info.get("source_code"),
-            abi=contract_info.get("abi"),
-        )
+            # Build ContractAnalysis object
+            result = ContractAnalysis(
+                address=contract_info["address"],
+                chain=chain,
+                name=contract_info.get("name", "Unknown"),
+                is_verified=contract_info.get("is_verified", False),
+                compiler_version=contract_info.get("compiler_version"),
+                summary=analysis_data.get("summary", analysis_text[:500]),
+                purpose=analysis_data.get("purpose", "Unknown"),
+                risk_level=RiskLevel(analysis_data.get("risk_level", "unknown")),
+                risk_factors=analysis_data.get("risk_factors", []),
+                key_functions=analysis_data.get("key_functions", []),
+                token_info=analysis_data.get("token_info"),
+                source_code=contract_info.get("source_code"),
+                abi=contract_info.get("abi"),
+            )
+            
+            logger.info(f"Successfully analyzed contract: {result.name} (risk: {result.risk_level})")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to analyze contract {contract_info.get('address')}: {e}")
+            raise AIAnalysisError(f"Contract analysis failed: {e}") from e
 
     def analyze_wallet(
         self,
@@ -351,20 +383,47 @@ Respond ONLY with valid JSON."""
             
         Returns:
             The AI's response as text
+            
+        Raises:
+            AIAnalysisError: If the AI call fails
         """
-        if self.provider == "openai":
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=self.max_tokens,
-                temperature=0.7,
-            )
-            return response.choices[0].message.content
-        
-        else:  # anthropic
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            return response.content[0].text
+        try:
+            logger.debug(f"Calling {self.provider} API (model: {self.model})")
+            
+            if self.provider == "openai":
+                from openai import OpenAIError
+                try:
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=self.max_tokens,
+                        temperature=0.7,
+                    )
+                    result = response.choices[0].message.content
+                    logger.debug(f"OpenAI API call successful ({len(result)} chars)")
+                    return result
+                except OpenAIError as e:
+                    logger.error(f"OpenAI API error: {e}")
+                    raise AIAnalysisError(f"OpenAI API failed: {e}") from e
+            
+            else:  # anthropic
+                from anthropic import APIError
+                try:
+                    response = self.client.messages.create(
+                        model=self.model,
+                        max_tokens=self.max_tokens,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    result = response.content[0].text
+                    logger.debug(f"Anthropic API call successful ({len(result)} chars)")
+                    return result
+                except APIError as e:
+                    logger.error(f"Anthropic API error: {e}")
+                    raise AIAnalysisError(f"Anthropic API failed: {e}") from e
+                    
+        except ImportError as e:
+            logger.error(f"Failed to import AI provider: {e}")
+            raise AIAnalysisError(f"AI provider library not available: {e}") from e
+        except Exception as e:
+            logger.error(f"Unexpected error calling AI: {e}")
+            raise AIAnalysisError(f"AI call failed: {e}") from e

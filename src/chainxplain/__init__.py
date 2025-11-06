@@ -2,6 +2,15 @@
 ChainXplain - AI-powered blockchain contract and wallet analyzer.
 """
 
+# Setup logging first
+from chainxplain.logging_config import setup_logging
+import os
+
+# Configure logging based on environment
+log_level = os.getenv("CHAINXPLAIN_LOG_LEVEL", "INFO")
+log_file = os.getenv("CHAINXPLAIN_LOG_FILE")
+setup_logging(level=log_level, log_file=log_file)
+
 from chainxplain.client import ChainExplainClient
 from chainxplain.models import (
     ContractAnalysis,

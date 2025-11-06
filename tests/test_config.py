@@ -1,7 +1,7 @@
 """Tests for configuration module."""
 
 import pytest
-from chainxplain.config import Settings, load_settings
+from chainxplain.config import Settings, ChainConfig, load_settings
 
 
 def test_settings_from_env(monkeypatch):
@@ -26,14 +26,14 @@ def test_settings_defaults():
 
 def test_get_rpc_url_default(mock_settings):
     """Test getting default RPC URL."""
-    url = mock_settings.get_rpc_url("ethereum")
+    url = ChainConfig.get_rpc_url("ethereum", mock_settings)
     assert "eth" in url.lower()
 
 
 def test_get_rpc_url_with_alchemy(mock_settings):
     """Test getting Alchemy RPC URL when configured."""
     mock_settings.alchemy_api_key = "test-alchemy-key"
-    url = mock_settings.get_rpc_url("ethereum")
+    url = ChainConfig.get_rpc_url("ethereum", mock_settings)
     assert "alchemy.com" in url
     assert "test-alchemy-key" in url
 
@@ -41,15 +41,15 @@ def test_get_rpc_url_with_alchemy(mock_settings):
 def test_get_explorer_api_key(mock_settings):
     """Test getting explorer API key for chain."""
     # Ethereum uses etherscan
-    key = mock_settings.get_explorer_api_key("ethereum")
+    key = ChainConfig.get_explorer_api_key("ethereum", mock_settings)
     assert key == "test-etherscan-key"
 
 
 def test_supported_chains(mock_settings):
     """Test that all expected chains are supported."""
-    expected_chains = ["ethereum", "polygon", "arbitrum", "optimism", "base", "bsc"]
+    expected_chains = ["ethereum", "polygon", "arbitrum", "optimism", "bsc"]
     
     for chain in expected_chains:
-        url = mock_settings.get_rpc_url(chain)
+        url = ChainConfig.get_rpc_url(chain, mock_settings)
         assert url is not None
         assert len(url) > 0

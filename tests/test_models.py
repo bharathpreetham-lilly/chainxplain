@@ -13,13 +13,16 @@ def test_contract_analysis_creation():
     """Test creating ContractAnalysis model."""
     analysis = ContractAnalysis(
         address="0xtest",
+        chain="ethereum",
         name="Test Contract",
         summary="A test contract",
+        purpose="Testing purposes",
         risk_level="low",
         key_functions=["transfer", "approve"],
     )
     
     assert analysis.address == "0xtest"
+    assert analysis.chain == "ethereum"
     assert analysis.name == "Test Contract"
     assert analysis.risk_level == "low"
     assert len(analysis.key_functions) == 2
@@ -29,22 +32,30 @@ def test_wallet_analysis_creation():
     """Test creating WalletAnalysis model."""
     analysis = WalletAnalysis(
         address="0xwallet",
+        chain="ethereum",
+        native_balance="1.5",
         total_transactions=100,
-        token_holdings=[],
-        recent_activity=[],
+        token_holdings={},
         summary="Active wallet",
+        activity_pattern="Regular transactions",
+        wallet_type="DeFi user",
     )
     
     assert analysis.address == "0xwallet"
+    assert analysis.chain == "ethereum"
     assert analysis.total_transactions == 100
     assert analysis.summary == "Active wallet"
 
 
 def test_transaction_analysis_creation():
     """Test creating TransactionAnalysis model."""
+    from datetime import datetime
+    
     analysis = TransactionAnalysis(
-        tx_hash="0xtx",
-        status="success",
+        hash="0xtx",
+        chain="ethereum",
+        status=True,
+        timestamp=datetime.utcnow(),
         from_address="0xfrom",
         to_address="0xto",
         value="1.0",
@@ -53,8 +64,9 @@ def test_transaction_analysis_creation():
         explanation="Simple transfer",
     )
     
-    assert analysis.tx_hash == "0xtx"
-    assert analysis.status == "success"
+    assert analysis.hash == "0xtx"
+    assert analysis.chain == "ethereum"
+    assert analysis.status is True
     assert analysis.gas_used == 21000
 
 
@@ -64,6 +76,7 @@ def test_chain_config_creation():
         name="ethereum",
         rpc_url="https://eth.llamarpc.com",
         explorer_url="https://etherscan.io",
+        explorer_api_url="https://api.etherscan.io/api",
         chain_id=1,
     )
     
@@ -78,6 +91,8 @@ def test_contract_analysis_validation():
     with pytest.raises(Exception):  # Pydantic validation error
         ContractAnalysis(
             address="0xtest",
+            chain="ethereum",
             summary="test",
+            purpose="test",
             risk_level="invalid",  # Invalid risk level
         )

@@ -4,6 +4,7 @@ ChainXplain CLI - Command-line interface for blockchain analysis.
 Beautiful terminal interface for analyzing contracts, wallets, and transactions.
 """
 
+import logging
 import sys
 from typing import Optional
 import typer
@@ -11,12 +12,18 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.markdown import Markdown
+from rich.syntax import Syntax
 from rich import print as rprint
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from chainxplain.client import ChainExplainClient
 from chainxplain.config import load_settings
+from chainxplain.logging_config import setup_logging
 
+logger = logging.getLogger(__name__)
+
+# Setup logging for CLI
+setup_logging(level="WARNING")  # Keep CLI output clean, only show warnings/errors
 
 # Create Typer app
 app = typer.Typer(
@@ -32,9 +39,11 @@ console = Console()
 def get_client() -> ChainExplainClient:
     """Get or create ChainXplain client."""
     try:
+        logger.debug("Loading settings for CLI client")
         settings = load_settings()
         return ChainExplainClient(settings=settings)
     except ValueError as e:
+        logger.error(f"Failed to create client: {e}")
         console.print(f"[red]❌ Error:[/red] {e}")
         console.print("\n[yellow]Please configure your API keys in .env file:[/yellow]")
         console.print("  ANTHROPIC_API_KEY=your-key-here")
@@ -124,12 +133,13 @@ def explain_contract(
         for func in result.key_functions[:10]:  # Show top 10
             console.print(f"  • {func}")
     
-    # Detailed analysis (verbose mode)
-    if verbose and result.detailed_analysis:
-        console.print(f"\n[bold cyan]📊 Detailed Analysis:[/bold cyan]")
+    # Detailed analysis (verbose mode) - show source code if available
+    if verbose and result.source_code:
+        console.print(f"\n[bold cyan]📊 Source Code:[/bold cyan]")
         console.print(Panel(
-            Markdown(result.detailed_analysis),
+            Syntax(result.source_code[:2000], "solidity", theme="monokai", line_numbers=True),
             border_style="green",
+            title="Contract Source (first 2000 chars)"
         ))
     
     console.print()
@@ -190,31 +200,42 @@ def analyze_wallet_cmd(
         holdings_table.add_column("Balance", justify="right")
         holdings_table.add_column("Value (USD)", justify="right")
         
-        for holding in result.token_holdings[:20]:  # Top 20
-            holdings_table.add_row(
-                holding.get("symbol", "Unknown"),
-                f"{holding.get('balance', 0):.4f}",
-                f"${holding.get('value_usd', 0):.2f}" if holding.get('value_usd') else "N/A"
-            )
+        # token_holdings is now a Dict[str, Any]
+        for token_symbol, holding_data in list(result.token_holdings.items())[:20]:  # Top 20
+            if isinstance(holding_data, dict):
+                holdings_table.add_row(
+                    token_symbol,
+                    f"{holding_data.get('balance', 0):.4f}",
+                    f"${holding_data.get('value_usd', 0):.2f}" if holding_data.get('value_usd') else "N/A"
+                )
+            else:
+                # Simple value
+                holdings_table.add_row(
+                    token_symbol,
+                    str(holding_data),
+                    "N/A"
+                )
         
         console.print(holdings_table)
     
-    # Recent activity
-    if result.recent_activity:
-        console.print(f"\n[bold cyan]📊 Recent Activity:[/bold cyan]")
-        activity_table = Table()
-        activity_table.add_column("Type", style="cyan")
-        activity_table.add_column("Details")
-        activity_table.add_column("Time", style="dim")
+    # Recent transactions
+    if result.recent_transactions:
+        console.print(f"\n[bold cyan]📊 Recent Transactions:[/bold cyan]")
+        tx_table = Table()
+        tx_table.add_column("Hash", style="cyan")
+        tx_table.add_column("From/To")
+        tx_table.add_column("Value", justify="right")
+        tx_table.add_column("Time", style="dim")
         
-        for activity in result.recent_activity[:10]:  # Last 10
-            activity_table.add_row(
-                activity.get("type", "Unknown"),
-                activity.get("description", "N/A"),
-                activity.get("timestamp", "N/A")
+        for tx in result.recent_transactions[:10]:  # Last 10
+            tx_table.add_row(
+                tx.hash[:10] + "..." if len(tx.hash) > 10 else tx.hash,
+                f"{tx.from_address[:8]}...→{tx.to_address[:8] if tx.to_address else 'Contract'}...",
+                tx.value,
+                tx.timestamp.strftime("%Y-%m-%d %H:%M") if hasattr(tx.timestamp, 'strftime') else str(tx.timestamp)
             )
         
-        console.print(activity_table)
+        console.print(tx_table)
     
     # Summary
     console.print(f"\n[bold cyan]📝 Summary:[/bold cyan]")
@@ -270,11 +291,12 @@ def analyze_transaction(
         border_style="cyan",
     ))
     
-    # Status
-    status_icon = "✅" if result.status == "success" else "❌"
-    status_color = "green" if result.status == "success" else "red"
+    # Status (now a boolean)
+    status_icon = "✅" if result.status else "❌"
+    status_color = "green" if result.status else "red"
+    status_text = "SUCCESS" if result.status else "FAILED"
     
-    console.print(f"\n[bold]Status:[/bold] [{status_color}]{status_icon} {result.status.upper()}[/{status_color}]")
+    console.print(f"\n[bold]Status:[/bold] [{status_color}]{status_icon} {status_text}[/{status_color}]")
     console.print(f"[bold]Hash:[/bold] [dim]{tx_hash}[/dim]")
     console.print(f"[bold]From:[/bold] [dim]{result.from_address}[/dim]")
     console.print(f"[bold]To:[/bold] [dim]{result.to_address}[/dim]")
